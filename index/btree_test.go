@@ -1,8 +1,8 @@
 package index_test
 
 import (
-	"KVstore/bitcast/data"
-	"KVstore/bitcast/index"
+	"KVstore/data"
+	"KVstore/index"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

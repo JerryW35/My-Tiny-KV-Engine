@@ -1,7 +1,7 @@
 package index
 
 import (
-	"KVstore/bitcast/data"
+	"KVstore/data"
 	"github.com/google/btree"
 	"sync"
 )
