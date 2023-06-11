@@ -13,3 +13,8 @@ type IOManager interface {
 	// Close the file
 	Close() error
 }
+
+// init IO manager
+func InitIOManager(fileName string) (IOManager, error) {
+	return NewFileIOManager(fileName)
+}
