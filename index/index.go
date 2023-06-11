@@ -14,6 +14,24 @@ type Indexer interface {
 	// Delete the item by the key
 	Delete(key []byte) bool
 }
+type IndexType = int8
+
+const (
+	Btree IndexType = iota + 1
+	ART
+)
+
+// init Indexer by IndexType
+func NewIndexr(typ IndexType) Indexer {
+	switch typ {
+	case Btree:
+		return NewBTree()
+	case ART:
+		return nil
+	default:
+		panic("unsupported idnex type")
+	}
+}
 
 // Item is our node type for the btree
 type Item struct {

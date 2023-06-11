@@ -1,8 +1,11 @@
 package KVstore
 
-type configs struct {
+import "KVstore/index"
+
+type Configs struct {
 	DirPath      string
 	DataFileSize int64
 	// whether it needs to persist per writing operation
-	SyncWrites bool
+	SyncWrites  bool
+	IndexerType index.IndexType
 }
