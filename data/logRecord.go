@@ -30,8 +30,13 @@ type logRecordHeader struct {
 
 // EncodeLogRecord encode the log record and return bytes and its length
 func EncodeLogRecord(record *LogRecord) ([]byte, int64) {
+	//init a header
+
 	return nil, 0
 }
 func DecodeLogRecord(buf []byte) (*logRecordHeader, int64) {
 	return nil, 0
+}
+func getCRC(log *LogRecord, header []byte) uint32 {
+	return 0
 }
