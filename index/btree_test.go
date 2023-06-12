@@ -1,4 +1,4 @@
-package test_test
+package index_test
 
 import (
 	"KVstore/data"

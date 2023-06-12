@@ -1,7 +1,6 @@
-package test
+package fio
 
 import (
-	fio2 "KVstore/fio"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
@@ -16,7 +15,7 @@ func destroyFile(name string) {
 
 func TestFileIO_Write(t *testing.T) {
 	curFile, err := os.Getwd()
-	fio, err := fio2.NewFileIOManager(filepath.Join(curFile, "test.data"))
+	fio, err := NewFileIOManager(filepath.Join(curFile, "test.data"))
 	assert.Nil(t, err)
 	assert.NotNil(t, fio)
 
@@ -31,7 +30,7 @@ func TestFileIO_Write(t *testing.T) {
 }
 func TestFileIO_Read(t *testing.T) {
 	curFile, err := os.Getwd()
-	fio, err := fio2.NewFileIOManager(filepath.Join(curFile, "test.data"))
+	fio, err := NewFileIOManager(filepath.Join(curFile, "test.data"))
 	assert.Nil(t, err)
 	assert.NotNil(t, fio)
 
@@ -48,7 +47,7 @@ func TestFileIO_Read(t *testing.T) {
 }
 func TestFileIO_Sync(t *testing.T) {
 	curFile, err := os.Getwd()
-	fio, err := fio2.NewFileIOManager(filepath.Join(curFile, "test.data"))
+	fio, err := NewFileIOManager(filepath.Join(curFile, "test.data"))
 	assert.Nil(t, err)
 	assert.NotNil(t, fio)
 
@@ -58,7 +57,7 @@ func TestFileIO_Sync(t *testing.T) {
 }
 func TestFileIO_Close(t *testing.T) {
 	curFile, err := os.Getwd()
-	fio, err := fio2.NewFileIOManager(filepath.Join(curFile, "test.data"))
+	fio, err := NewFileIOManager(filepath.Join(curFile, "test.data"))
 	assert.Nil(t, err)
 	assert.NotNil(t, fio)
 

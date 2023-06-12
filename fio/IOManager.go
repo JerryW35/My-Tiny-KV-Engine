@@ -12,6 +12,7 @@ type IOManager interface {
 	Sync() error
 	// Close the file
 	Close() error
+	Size() (int64, error)
 }
 
 // init IO manager

@@ -1,7 +1,6 @@
-package DataBase
+package KVstore
 
 import (
-	"KVstore"
 	"KVstore/data"
 	"KVstore/index"
 	"io"
@@ -15,7 +14,7 @@ import (
 // some APIs for the user
 
 type DB struct {
-	config     *KVstore.Configs
+	config     *Configs
 	mutex      *sync.RWMutex
 	activeFile *data.File
 	olderFiles map[uint32]*data.File
@@ -26,7 +25,7 @@ type DB struct {
 func (db *DB) Put(key []byte, value []byte) error {
 	//check if the key is empty
 	if len(key) == 0 {
-		return KVstore.ErrorKeyEmpty
+		return ErrorKeyEmpty
 	}
 	//construct the log record
 	logRecord := data.LogRecord{
@@ -41,7 +40,7 @@ func (db *DB) Put(key []byte, value []byte) error {
 	//update index
 	ok := db.index.Put(key, pos)
 	if !ok {
-		return KVstore.ErrorUpdateIndex
+		return ErrorUpdateIndex
 	}
 	return nil
 }
@@ -50,11 +49,11 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	defer db.mutex.RUnlock()
 	// check if the key valid or exists
 	if len(key) == 0 {
-		return nil, KVstore.ErrorInvalidKey
+		return nil, ErrorInvalidKey
 	}
 	logRecordPos := db.index.Get(key)
 	if logRecordPos == nil {
-		return nil, KVstore.ErrorKeyNotFound
+		return nil, ErrorKeyNotFound
 	}
 	//get the value from the file
 	//1.check if is in the active file
@@ -65,7 +64,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 		dataFile = db.olderFiles[logRecordPos.Fid]
 	}
 	if dataFile == nil {
-		return nil, KVstore.ErrorFileNotFound
+		return nil, ErrorFileNotFound
 	}
 
 	//read the file by offset
@@ -75,13 +74,13 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	}
 	// check the type of logRecord
 	if logRecord.Type == data.DELETE {
-		return nil, KVstore.ErrorKeyNotFound
+		return nil, ErrorKeyNotFound
 	}
 	return logRecord.Value, nil
 }
 func (db *DB) Delete(key []byte) error {
 	if len(key) == 0 {
-		return KVstore.ErrorKeyEmpty
+		return ErrorKeyEmpty
 	}
 	//check if key exists in the indexer
 	if pos := db.index.Get(key); pos == nil {
@@ -95,12 +94,12 @@ func (db *DB) Delete(key []byte) error {
 	}
 	ok := db.index.Delete(key)
 	if !ok {
-		return KVstore.ErrorUpdateIndex
+		return ErrorUpdateIndex
 	}
 	return nil
 }
 
-func Open(configs KVstore.Configs) (*DB, error) {
+func Open(configs Configs) (*DB, error) {
 	// firstly check the config
 	err := checkConfigs(configs)
 	if err != nil {
@@ -196,7 +195,7 @@ func (db *DB) setActivateFile() error {
 func (db *DB) loadFiles() error {
 	dirs, err := os.ReadDir(db.config.DirPath)
 	if err != nil {
-		return KVstore.ErrorLoadFiles
+		return ErrorLoadFiles
 	}
 	var fileIds []int
 	//find files with suffix .data
@@ -205,7 +204,7 @@ func (db *DB) loadFiles() error {
 			prefix := strings.Split(dir.Name(), ".")
 			fileId, err := strconv.Atoi(prefix[0])
 			if err != nil {
-				return KVstore.ErrorParse
+				return ErrorParse
 			}
 			fileIds = append(fileIds, fileId)
 		}
@@ -263,7 +262,7 @@ func (db *DB) loadIndexer() error {
 				ok = db.index.Put(logRecord.Key, &logRecordPos)
 			}
 			if !ok {
-				return KVstore.ErrorUpdateIndex
+				return ErrorUpdateIndex
 			}
 			offset += lens
 		}
@@ -274,12 +273,12 @@ func (db *DB) loadIndexer() error {
 	}
 	return nil
 }
-func checkConfigs(config KVstore.Configs) error {
+func checkConfigs(config Configs) error {
 	if config.DirPath == "" {
-		return KVstore.ConfigErrorDBDirEmpty
+		return ConfigErrorDBDirEmpty
 	}
 	if config.DataFileSize <= 0 {
-		return KVstore.ConfigErrorSize
+		return ConfigErrorSize
 	}
 	return nil
 }
