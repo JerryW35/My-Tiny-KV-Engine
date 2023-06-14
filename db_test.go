@@ -11,7 +11,8 @@ import (
 func destroyDB(db *DB) {
 	if db != nil {
 		if db.activeFile != nil {
-			_ = db.activeFile.Close() // todo 实现了 Close 方法之后，这里使用 Close 方法替代
+			//todo After the Close method is implemented, the Close method is used here
+			_ = db.activeFile.Close()
 		}
 		err := os.RemoveAll(db.config.DirPath)
 		if err != nil {
@@ -41,44 +42,44 @@ func TestDB_Put(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
-	// 1.正常 Put 一条数据
+	// 1. Put one log
 	err = db.Put(utils.GetTestKey(1), utils.RandomValue(24))
 	assert.Nil(t, err)
 	val1, err := db.Get(utils.GetTestKey(1))
 	assert.Nil(t, err)
 	assert.NotNil(t, val1)
 
-	// 2.重复 Put key 相同的数据
+	// 2.repeat Put key with same key and value
 	err = db.Put(utils.GetTestKey(1), utils.RandomValue(24))
 	assert.Nil(t, err)
 	val2, err := db.Get(utils.GetTestKey(1))
 	assert.Nil(t, err)
 	assert.NotNil(t, val2)
 
-	// 3.key 为空
+	// 3.key is nil
 	err = db.Put(nil, utils.RandomValue(24))
 	assert.Equal(t, ErrorKeyEmpty, err)
 
-	// 4.value 为空
+	// 4.value is nil
 	err = db.Put(utils.GetTestKey(22), nil)
 	assert.Nil(t, err)
 	val3, err := db.Get(utils.GetTestKey(22))
 	assert.Equal(t, 0, len(val3))
 	assert.Nil(t, err)
 
-	// 5.写到数据文件进行了转换
+	// 5.write until full
 	for i := 0; i < 1000000; i++ {
 		err := db.Put(utils.GetTestKey(i), utils.RandomValue(128))
 		assert.Nil(t, err)
 	}
 	assert.Equal(t, 2, len(db.olderFiles))
 
-	// 6.重启后再 Put 数据
-	//db.Close() // todo 实现 Close 方法后这里用 Close() 替代
+	// 6.restart and put&read again
+	//db.Close() //
 	err = db.activeFile.Close()
 	assert.Nil(t, err)
 
-	//重启数据库
+	//restart database
 	db2, err := Open(configs)
 	assert.Nil(t, err)
 	assert.NotNil(t, db2)
@@ -92,7 +93,7 @@ func TestDB_Put(t *testing.T) {
 
 func TestDB_Get(t *testing.T) {
 	configs := DefaultConfigs
-	dir, _ := os.MkdirTemp("", "bitcask-go-get")
+	dir, _ := os.MkdirTemp("", "tests")
 	configs.DirPath = dir + "/"
 	configs.DataFileSize = 64 * 1024 * 1024
 	db, err := Open(configs)
@@ -100,19 +101,19 @@ func TestDB_Get(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
-	// 1.正常读取一条数据
+	// 1.read one log
 	err = db.Put(utils.GetTestKey(11), utils.RandomValue(24))
 	assert.Nil(t, err)
 	val1, err := db.Get(utils.GetTestKey(11))
 	assert.Nil(t, err)
 	assert.NotNil(t, val1)
 
-	// 2.读取一个不存在的 key
+	// 2.read not existed log
 	val2, err := db.Get([]byte("some key unknown"))
 	assert.Nil(t, val2)
 	assert.Equal(t, ErrorKeyNotFound, err)
 
-	// 3.值被重复 Put 后在读取
+	// 3.put repeated value then read
 	err = db.Put(utils.GetTestKey(22), utils.RandomValue(24))
 	assert.Nil(t, err)
 	err = db.Put(utils.GetTestKey(22), utils.RandomValue(24))
@@ -120,7 +121,7 @@ func TestDB_Get(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, val3)
 
-	// 4.值被删除后再 Get
+	// 4. delete then read
 	err = db.Put(utils.GetTestKey(33), utils.RandomValue(24))
 	assert.Nil(t, err)
 	err = db.Delete(utils.GetTestKey(33))
@@ -129,7 +130,7 @@ func TestDB_Get(t *testing.T) {
 	assert.Equal(t, 0, len(val4))
 	assert.Equal(t, ErrorKeyNotFound, err)
 
-	// 5.转换为了旧的数据文件，从旧的数据文件上获取 value
+	// 5.transfer to older file and read from it
 	for i := 100; i < 1000000; i++ {
 		err := db.Put(utils.GetTestKey(i), utils.RandomValue(128))
 		assert.Nil(t, err)
@@ -139,12 +140,11 @@ func TestDB_Get(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, val5)
 
-	// 6.重启后，前面写入的数据都能拿到
-	//db.Close() // todo 实现 Close 方法后这里用 Close() 替代
+	// 6. restart and get all logs
+	//db.Close() //todo After the Close method is implemented, the Close method is used here
 	err = db.activeFile.Close()
 	assert.Nil(t, err)
 
-	// 重启数据库
 	db2, err := Open(configs)
 	val6, err := db2.Get(utils.GetTestKey(11))
 	assert.Nil(t, err)
@@ -163,7 +163,7 @@ func TestDB_Get(t *testing.T) {
 
 func TestDB_Delete(t *testing.T) {
 	configs := DefaultConfigs
-	dir, _ := os.MkdirTemp("", "bitcask-go-delete")
+	dir, _ := os.MkdirTemp("", "tests")
 	configs.DirPath = dir + "/"
 	configs.DataFileSize = 64 * 1024 * 1024
 	db, err := Open(configs)
@@ -171,7 +171,7 @@ func TestDB_Delete(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
-	// 1.正常删除一个存在的 key
+	// 1.delete a key
 	err = db.Put(utils.GetTestKey(11), utils.RandomValue(128))
 	assert.Nil(t, err)
 	err = db.Delete(utils.GetTestKey(11))
@@ -179,15 +179,15 @@ func TestDB_Delete(t *testing.T) {
 	_, err = db.Get(utils.GetTestKey(11))
 	assert.Equal(t, ErrorKeyNotFound, err)
 
-	// 2.删除一个不存在的 key
+	// 2.delete a not existed key
 	err = db.Delete([]byte("unknown key"))
 	assert.Nil(t, err)
 
-	// 3.删除一个空的 key
+	// 3.delete nil key
 	err = db.Delete(nil)
 	assert.Equal(t, ErrorKeyEmpty, err)
 
-	// 4.值被删除之后重新 Put
+	// 4. delete then put
 	err = db.Put(utils.GetTestKey(22), utils.RandomValue(128))
 	assert.Nil(t, err)
 	err = db.Delete(utils.GetTestKey(22))
@@ -199,12 +199,12 @@ func TestDB_Delete(t *testing.T) {
 	assert.NotNil(t, val1)
 	assert.Nil(t, err)
 
-	// 5.重启之后，再进行校验
-	//db.Close() // todo 实现 Close 方法后这里用 Close() 替代
+	// 5.after restart then check
+	//db.Close()
 	err = db.activeFile.Close()
 	assert.Nil(t, err)
 
-	// 重启数据库
+	// restart database
 	db2, err := Open(configs)
 	_, err = db2.Get(utils.GetTestKey(11))
 	assert.Equal(t, ErrorKeyNotFound, err)

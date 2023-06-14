@@ -3,7 +3,6 @@ package KVstore
 import (
 	"KVstore/data"
 	"KVstore/index"
-	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -23,6 +22,9 @@ type DB struct {
 	fileIds    []int // only used for loading index
 }
 
+/*
+APIs for user
+*/
 func (db *DB) Put(key []byte, value []byte) error {
 	//check if the key is empty
 	if len(key) == 0 {
@@ -99,6 +101,10 @@ func (db *DB) Delete(key []byte) error {
 	}
 	return nil
 }
+
+/*
+	some useful methods
+*/
 
 func Open(configs Configs) (*DB, error) {
 	// firstly check the config
@@ -282,7 +288,4 @@ func checkConfigs(config Configs) error {
 		return ConfigErrorSize
 	}
 	return nil
-}
-func main() {
-	fmt.Println("hhhh")
 }
