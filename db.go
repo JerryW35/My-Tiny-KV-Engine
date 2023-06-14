@@ -3,6 +3,7 @@ package KVstore
 import (
 	"KVstore/data"
 	"KVstore/index"
+	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -281,4 +282,7 @@ func checkConfigs(config Configs) error {
 		return ConfigErrorSize
 	}
 	return nil
+}
+func main() {
+	fmt.Println("hhhh")
 }

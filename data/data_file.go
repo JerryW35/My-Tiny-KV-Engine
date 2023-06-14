@@ -22,7 +22,7 @@ type File struct {
 }
 
 func OpenFile(dirPath string, fileId uint32) (*File, error) {
-	fileName := filepath.Join(dirPath + fmt.Sprintf("%9d", fileId) + FileSuffix)
+	fileName := filepath.Join(dirPath + fmt.Sprintf("%09d", fileId) + FileSuffix)
 	fio, err := fio.NewFileIOManager(fileName)
 	if err != nil {
 		return nil, err
