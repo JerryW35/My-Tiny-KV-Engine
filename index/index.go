@@ -13,7 +13,24 @@ type Indexer interface {
 	Get(key []byte) *data.LogRecordPos
 	// Delete the item by the key
 	Delete(key []byte) bool
+
+	Iterator(reverse bool) IndexrIterator
 }
+
+// generic IndexerIterator
+type IndexrIterator interface {
+	Rewind() //Back to the beginning
+	// Seek Find the first target key that is greater (or less) than or equal
+	// to the incoming key, then iterate from this key
+	Seek(key []byte)
+
+	Next()                     // the next key
+	Valid() bool               // if the key and the position is valid, for exit the iteration
+	Key() []byte               //current key
+	Value() *data.LogRecordPos ///current value position
+	Close()
+}
+
 type IndexType = int8
 
 const (

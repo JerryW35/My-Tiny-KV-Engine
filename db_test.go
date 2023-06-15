@@ -87,6 +87,8 @@ func TestDB_Put(t *testing.T) {
 	err = db2.Put(utils.GetTestKey(55), val4)
 	assert.Nil(t, err)
 	val5, err := db2.Get(utils.GetTestKey(55))
+	t.Log(string(val4))
+	t.Log(string(val5))
 	assert.Nil(t, err)
 	assert.Equal(t, val4, val5)
 }

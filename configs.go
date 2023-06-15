@@ -12,10 +12,18 @@ type Configs struct {
 	SyncWrites  bool
 	IndexerType index.IndexType
 }
+type IteratorConfigs struct {
+	Reverse bool
+	Prefix  []byte
+}
 
 var DefaultConfigs = Configs{
 	DirPath:      os.TempDir(),
 	DataFileSize: 256 * 1024 * 1024, //256MB
 	SyncWrites:   false,
 	IndexerType:  index.Btree,
+}
+var DefaultIteratorConfigs = IteratorConfigs{
+	Reverse: false,
+	Prefix:  nil,
 }

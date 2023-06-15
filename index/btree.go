@@ -2,7 +2,9 @@ package index
 
 import (
 	"KVstore/data"
+	"bytes"
 	"github.com/google/btree"
+	"sort"
 	"sync"
 )
 
@@ -52,4 +54,80 @@ func (bt *BTree) Delete(key []byte) bool {
 		return false
 	}
 	return true
+}
+
+/*
+b tree iterator
+*/
+type BTreeIterator struct {
+	currentIndex int
+	reverse      bool    // whether iterate reversely
+	values       []*Item // is same as tree node
+}
+
+func (bt BTree) Iterator(reverse bool) IndexrIterator {
+	if bt.tree == nil {
+		return nil
+	}
+	bt.lock.RLock()
+	defer bt.lock.RUnlock()
+	return newBTreeIterator(bt.tree, reverse)
+}
+func newBTreeIterator(tree *btree.BTree, reverse bool) *BTreeIterator {
+	var idx int
+	values := make([]*Item, tree.Len())
+
+	//put all logs into memory(values)
+	saveValues := func(it btree.Item) bool {
+		values[idx] = it.(*Item)
+		idx++
+		return true
+	}
+	if reverse {
+		tree.Descend(saveValues)
+	} else {
+		tree.Ascend(saveValues)
+	}
+	return &BTreeIterator{
+		reverse:      reverse,
+		currentIndex: 0,
+		values:       values,
+	}
+}
+
+func (it *BTreeIterator) Rewind() {
+	it.currentIndex = 0
+}
+
+func (it *BTreeIterator) Seek(key []byte) {
+	// use binary search to speed up
+	if it.reverse {
+		it.currentIndex = sort.Search(len(it.values), func(i int) bool {
+			return bytes.Compare(it.values[i].key, key) <= 0
+		})
+	} else {
+		it.currentIndex = sort.Search(len(it.values), func(i int) bool {
+			return bytes.Compare(it.values[i].key, key) >= 0
+		})
+	}
+}
+
+func (it *BTreeIterator) Next() {
+	it.currentIndex++
+}
+
+func (it *BTreeIterator) Valid() bool {
+	return it.currentIndex < len(it.values)
+}
+
+func (it *BTreeIterator) Key() []byte {
+	return it.values[it.currentIndex].key
+}
+
+func (it *BTreeIterator) Value() *data.LogRecordPos {
+	return it.values[it.currentIndex].pos
+}
+
+func (it *BTreeIterator) Close() {
+	it.values = nil
 }

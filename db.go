@@ -59,27 +59,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 		return nil, ErrorKeyNotFound
 	}
 	//get the value from the file
-	//1.check if is in the active file
-	var dataFile *data.File
-	if logRecordPos.Fid == db.activeFile.FileId {
-		dataFile = db.activeFile
-	} else {
-		dataFile = db.olderFiles[logRecordPos.Fid]
-	}
-	if dataFile == nil {
-		return nil, ErrorFileNotFound
-	}
-
-	//read the file by offset
-	logRecord, _, err := dataFile.Read(logRecordPos.Offset)
-	if err != nil {
-		return nil, err
-	}
-	// check the type of logRecord
-	if logRecord.Type == data.DELETE {
-		return nil, ErrorKeyNotFound
-	}
-	return logRecord.Value, nil
+	return db.getValueByPosition(logRecordPos)
 }
 func (db *DB) Delete(key []byte) error {
 	if len(key) == 0 {
@@ -288,4 +268,28 @@ func checkConfigs(config Configs) error {
 		return ConfigErrorSize
 	}
 	return nil
+}
+
+func (db *DB) getValueByPosition(logRecordPos *data.LogRecordPos) ([]byte, error) {
+	var dataFile *data.File
+	if logRecordPos.Fid == db.activeFile.FileId {
+		dataFile = db.activeFile
+	} else {
+		dataFile = db.olderFiles[logRecordPos.Fid]
+	}
+	if dataFile == nil {
+		return nil, ErrorFileNotFound
+	}
+
+	//read the file by offset
+	logRecord, _, err := dataFile.Read(logRecordPos.Offset)
+	if err != nil {
+		return nil, err
+	}
+	// check the type of logRecord
+	if logRecord.Type == data.DELETE {
+		return nil, ErrorKeyNotFound
+	}
+	return logRecord.Value, nil
+
 }
