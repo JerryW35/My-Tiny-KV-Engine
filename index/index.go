@@ -15,6 +15,7 @@ type Indexer interface {
 	Delete(key []byte) bool
 
 	Iterator(reverse bool) IndexrIterator
+	Size() int
 }
 
 // generic IndexerIterator

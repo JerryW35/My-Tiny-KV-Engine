@@ -10,6 +10,7 @@ type RecordType = byte
 const (
 	PUT RecordType = iota
 	DELETE
+	COMMIT
 )
 
 // crc type keySize valueSize
@@ -31,6 +32,10 @@ type logRecordHeader struct {
 	Type      RecordType
 	KeySize   uint32
 	ValueSize uint32
+}
+type TxnRecord struct {
+	Record *LogRecord
+	Pos    *LogRecordPos
 }
 
 // EncodeLogRecord encode the log record and return bytes and its length

@@ -55,6 +55,9 @@ func (bt *BTree) Delete(key []byte) bool {
 	}
 	return true
 }
+func (bt *BTree) Size() int {
+	return bt.tree.Len()
+}
 
 /*
 b tree iterator
