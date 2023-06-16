@@ -20,6 +20,7 @@ type DB struct {
 	olderFiles map[uint32]*data.File
 	index      index.Indexer
 	fileIds    []int // only used for loading index
+	seqNo      uint64
 }
 
 /*
@@ -32,11 +33,11 @@ func (db *DB) Put(key []byte, value []byte) error {
 	}
 	//construct the log record
 	logRecord := data.LogRecord{
-		Key:   key,
+		Key:   logRecordKeyWithSeqNo(key, NonTxnSeqNo),
 		Value: value,
 		Type:  data.PUT,
 	}
-	pos, err := db.appendLogRecord(&logRecord)
+	pos, err := db.appendLogRecordWithLock(&logRecord)
 	if err != nil {
 		return err
 	}
@@ -70,8 +71,8 @@ func (db *DB) Delete(key []byte) error {
 		return nil
 	}
 	//add a tombstone record
-	logRecord := data.LogRecord{Key: key, Type: data.DELETE}
-	_, err := db.appendLogRecord(&logRecord)
+	logRecord := data.LogRecord{Key: logRecordKeyWithSeqNo(key, NonTxnSeqNo), Type: data.DELETE}
+	_, err := db.appendLogRecordWithLock(&logRecord)
 	if err != nil {
 		return err
 	}
@@ -81,10 +82,33 @@ func (db *DB) Delete(key []byte) error {
 	}
 	return nil
 }
+func (db *DB) ListKeys() [][]byte {
+	iter := db.index.Iterator(false)
+	keys := make([][]byte, db.index.Size())
+	var idx int
+	for iter.Rewind(); iter.Valid(); iter.Next() {
+		keys[idx] = iter.Key()
+		idx++
+	}
+	return keys
+}
 
-/*
-	some useful methods
-*/
+// Fold get all keys and values, satisfy UDF, when get false return
+func (db *DB) Fold(fn func(key []byte, value []byte) bool) error {
+	db.mutex.RLock()
+	defer db.mutex.RUnlock()
+	iter := db.index.Iterator(false)
+	for iter.Rewind(); iter.Valid(); iter.Next() {
+		val, err := db.getValueByPosition(iter.Value())
+		if err != nil {
+			return err
+		}
+		if !fn(iter.Key(), val) {
+			break
+		}
+	}
+	return nil
+}
 
 func Open(configs Configs) (*DB, error) {
 	// firstly check the config
@@ -115,11 +139,45 @@ func Open(configs Configs) (*DB, error) {
 	}
 	return db, nil
 }
-
-func (db *DB) appendLogRecord(record *data.LogRecord) (*data.LogRecordPos, error) {
+func (db *DB) Close() error {
+	if db.activeFile == nil {
+		return nil
+	}
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
 
+	// close active file
+	if err := db.activeFile.Close(); err != nil {
+		return err
+	}
+	// close old files
+	for _, file := range db.olderFiles {
+		if err := file.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Sync do persistence
+func (db *DB) Sync() error {
+	if db.activeFile == nil {
+		return nil
+	}
+	db.mutex.Lock()
+	defer db.mutex.Unlock()
+	return db.activeFile.Sync()
+}
+
+/*
+some useful methods
+*/
+func (db *DB) appendLogRecordWithLock(record *data.LogRecord) (*data.LogRecordPos, error) {
+	db.mutex.Lock()
+	defer db.mutex.Unlock()
+	return db.appendLogRecord(record)
+}
+func (db *DB) appendLogRecord(record *data.LogRecord) (*data.LogRecordPos, error) {
 	// check if exist active file
 	// if not, create a new file
 	if db.activeFile == nil {
@@ -218,6 +276,21 @@ func (db *DB) loadIndexer() error {
 	if len(db.fileIds) == 0 {
 		return nil
 	}
+	updateIndex := func(key []byte, typ data.RecordType, pos *data.LogRecordPos) {
+		var ok bool
+		if typ == data.DELETE {
+			ok = db.index.Delete(key)
+		} else {
+			ok = db.index.Put(key, pos)
+		}
+		if !ok {
+			panic("failed to update index at startup")
+		}
+	}
+	// txn logs
+	txnReocrds := make(map[uint64][]*data.TxnRecord)
+	var curSeqNo = NonTxnSeqNo
+
 	for i, id := range db.fileIds {
 		var fileId = uint32(id)
 		var file *data.File
@@ -242,15 +315,27 @@ func (db *DB) loadIndexer() error {
 				Fid:    file.FileId,
 				Offset: offset,
 			}
-			var ok bool
-			if logRecord.Type == data.DELETE {
-				ok = db.index.Delete(logRecord.Key)
+			//update indexer
+			//get key and SeqNo
+			realKey, SeqNo := parseKeyWithSeqNo(logRecord.Key)
+			if SeqNo == NonTxnSeqNo {
+				updateIndex(realKey, logRecord.Type, &logRecordPos)
 			} else {
-				ok = db.index.Put(logRecord.Key, &logRecordPos)
+				// Txn commit valid
+				if logRecord.Type == data.COMMIT {
+					for _, txnRecord := range txnReocrds[SeqNo] {
+						updateIndex(txnRecord.Record.Key, txnRecord.Record.Type, txnRecord.Pos)
+					}
+				} else {
+					txnReocrds[SeqNo] = append(txnReocrds[SeqNo], &data.TxnRecord{
+						logRecord, &logRecordPos,
+					})
+				}
 			}
-			if !ok {
-				return ErrorUpdateIndex
+			if SeqNo > curSeqNo {
+				curSeqNo = SeqNo
 			}
+			//keyWithSeqNo := logRecord.Key
 			offset += lens
 		}
 		//if is the active file,update the WriteOffset
@@ -258,6 +343,7 @@ func (db *DB) loadIndexer() error {
 			db.activeFile.WriteOffset = offset
 		}
 	}
+	db.seqNo = curSeqNo
 	return nil
 }
 func checkConfigs(config Configs) error {

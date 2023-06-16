@@ -16,6 +16,10 @@ type IteratorConfigs struct {
 	Reverse bool
 	Prefix  []byte
 }
+type WriteBatchConfigs struct {
+	MaxBatchNum uint
+	SyncWrites  bool //whether do persistence when commits
+}
 
 var DefaultConfigs = Configs{
 	DirPath:      os.TempDir(),
@@ -26,4 +30,8 @@ var DefaultConfigs = Configs{
 var DefaultIteratorConfigs = IteratorConfigs{
 	Reverse: false,
 	Prefix:  nil,
+}
+var DefaultWriteBatchConfigs = WriteBatchConfigs{
+	MaxBatchNum: 10000,
+	SyncWrites:  true,
 }
