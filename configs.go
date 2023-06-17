@@ -2,7 +2,6 @@ package KVstore
 
 import (
 	"KVstore/index"
-	"os"
 )
 
 type Configs struct {
@@ -22,7 +21,7 @@ type WriteBatchConfigs struct {
 }
 
 var DefaultConfigs = Configs{
-	DirPath:      os.TempDir(),
+	DirPath:      "./",
 	DataFileSize: 256 * 1024 * 1024, //256MB
 	SyncWrites:   false,
 	IndexerType:  index.Btree,

@@ -94,3 +94,22 @@ func getCRC(log *LogRecord, header []byte) uint32 {
 	crc = crc32.Update(crc, crc32.IEEETable, log.Value)
 	return crc
 }
+
+// Encode LogRecordPos
+func EncodeLogRecordPos(pos *LogRecordPos) []byte {
+	buf := make([]byte, binary.MaxVarintLen64+binary.MaxVarintLen32)
+	var index = 0
+	index += binary.PutVarint(buf[index:], int64(pos.Fid))
+	index += binary.PutVarint(buf[index:], pos.Offset)
+	return buf[:index]
+}
+
+// Decode LogRecordPos
+func DecodeLogRecordPos(buf []byte) *LogRecordPos {
+	fileId, n := binary.Varint(buf[0:])
+	offset, n := binary.Varint(buf[n:])
+	return &LogRecordPos{
+		Fid:    uint32(fileId),
+		Offset: offset,
+	}
+}

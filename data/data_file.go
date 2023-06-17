@@ -10,6 +10,8 @@ import (
 )
 
 const FileSuffix = ".data"
+const HintFileName = "hint_index"
+const MergeFinishedFileName = "merge_FIN"
 
 var (
 	ErrorCRC = errors.New("the crc is wrong ")
@@ -22,17 +24,34 @@ type File struct {
 }
 
 func OpenFile(dirPath string, fileId uint32) (*File, error) {
-	fileName := filepath.Join(dirPath + fmt.Sprintf("%09d", fileId) + FileSuffix)
-	fio, err := fio.NewFileIOManager(fileName)
+	fileName := GetDataFileName(dirPath, fileId)
+	return NewDataFile(fileName, fileId)
+}
+
+// OpenHintFile open hint file
+func OpenHintFile(dirPath string) (*File, error) {
+	fileName := filepath.Join(dirPath, HintFileName)
+	return NewDataFile(fileName, 0)
+}
+func OpenMergeFinishedFile(dirPath string) (*File, error) {
+	fileName := filepath.Join(dirPath, MergeFinishedFileName)
+	return NewDataFile(fileName, 0)
+}
+func GetDataFileName(dir string, fileId uint32) string {
+	return filepath.Join(dir + fmt.Sprintf("%09d", fileId) + FileSuffix)
+}
+func NewDataFile(fileName string, fileId uint32) (*File, error) {
+	ioManager, err := fio.NewFileIOManager(fileName)
 	if err != nil {
 		return nil, err
 	}
 	return &File{
 		FileId:      fileId,
 		WriteOffset: 0,
-		IOManager:   fio,
+		IOManager:   ioManager,
 	}, nil
 }
+
 func (file *File) Write(data []byte) error {
 	n, err := file.IOManager.Write(data)
 	if err != nil {
@@ -41,6 +60,17 @@ func (file *File) Write(data []byte) error {
 	file.WriteOffset += int64(n)
 	return nil
 
+}
+
+// write index into hint file
+func (file *File) WriteHintRecord(key []byte, pos *LogRecordPos) error {
+	record := LogRecord{
+		Key:   key,
+		Value: EncodeLogRecordPos(pos),
+	}
+	encRecord, _ := EncodeLogRecord(&record)
+
+	return file.Write(encRecord)
 }
 func (file *File) Sync() error {
 	return file.IOManager.Sync()

@@ -13,4 +13,5 @@ var (
 	ErrorLoadFiles         = errors.New("cannot load files")
 	ErrorParse             = errors.New("the file name may be corrupted ")
 	ErrorExceedMaxBatchNum = errors.New("exceed max batch num")
+	ErrorIsMerging         = errors.New("the db is merging")
 )

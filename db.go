@@ -5,6 +5,7 @@ import (
 	"KVstore/index"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,6 +22,7 @@ type DB struct {
 	index      index.Indexer
 	fileIds    []int // only used for loading index
 	seqNo      uint64
+	isMerging  bool
 }
 
 /*
@@ -129,8 +131,15 @@ func Open(configs Configs) (*DB, error) {
 		olderFiles: make(map[uint32]*data.File),
 		index:      index.NewIndexr(configs.IndexerType),
 	}
+	// load merge files
+	if err := db.loadMergeFiles(); err != nil {
+		return nil, err
+	}
 	// load files
 	if err := db.loadFiles(); err != nil {
+		return nil, err
+	}
+	if err := db.loadIndexFromHint(); err != nil {
 		return nil, err
 	}
 	// load indexer
@@ -276,6 +285,18 @@ func (db *DB) loadIndexer() error {
 	if len(db.fileIds) == 0 {
 		return nil
 	}
+	// check if merge happened
+	hasMerge, nonMergeFileId := false, uint32(0)
+	mergeFinFileName := filepath.Join(db.config.DirPath, data.MergeFinishedFileName)
+	if _, err := os.Stat(mergeFinFileName); err == nil {
+		fid, err := db.getNonMergeFileID(db.config.DirPath)
+		if err != nil {
+			return err
+		}
+		hasMerge = true
+		nonMergeFileId = fid
+	}
+
 	updateIndex := func(key []byte, typ data.RecordType, pos *data.LogRecordPos) {
 		var ok bool
 		if typ == data.DELETE {
@@ -288,11 +309,15 @@ func (db *DB) loadIndexer() error {
 		}
 	}
 	// txn logs
-	txnReocrds := make(map[uint64][]*data.TxnRecord)
+	txnRecords := make(map[uint64][]*data.TxnRecord)
 	var curSeqNo = NonTxnSeqNo
 
 	for i, id := range db.fileIds {
 		var fileId = uint32(id)
+		// check if the file is already loaded from hintFile
+		if hasMerge && fileId < nonMergeFileId {
+			continue
+		}
 		var file *data.File
 		//load the file
 		if fileId == db.activeFile.FileId {
@@ -323,11 +348,11 @@ func (db *DB) loadIndexer() error {
 			} else {
 				// Txn commit valid
 				if logRecord.Type == data.COMMIT {
-					for _, txnRecord := range txnReocrds[SeqNo] {
+					for _, txnRecord := range txnRecords[SeqNo] {
 						updateIndex(txnRecord.Record.Key, txnRecord.Record.Type, txnRecord.Pos)
 					}
 				} else {
-					txnReocrds[SeqNo] = append(txnReocrds[SeqNo], &data.TxnRecord{
+					txnRecords[SeqNo] = append(txnRecords[SeqNo], &data.TxnRecord{
 						logRecord, &logRecordPos,
 					})
 				}
