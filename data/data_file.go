@@ -12,6 +12,7 @@ import (
 const FileSuffix = ".data"
 const HintFileName = "hint_index"
 const MergeFinishedFileName = "merge_FIN"
+const SeqNoFileName = "SeqNo"
 
 var (
 	ErrorCRC = errors.New("the crc is wrong ")
@@ -37,11 +38,15 @@ func OpenMergeFinishedFile(dirPath string) (*File, error) {
 	fileName := filepath.Join(dirPath, MergeFinishedFileName)
 	return NewDataFile(fileName, 0)
 }
+func OpenSeqNoFile(dirPath string) (*File, error) {
+	fileName := filepath.Join(dirPath, SeqNoFileName)
+	return NewDataFile(fileName, 0)
+}
 func GetDataFileName(dir string, fileId uint32) string {
 	return filepath.Join(dir + fmt.Sprintf("%09d", fileId) + FileSuffix)
 }
 func NewDataFile(fileName string, fileId uint32) (*File, error) {
-	ioManager, err := fio.NewFileIOManager(fileName)
+	ioManager, err := fio.InitIOManager(fileName)
 	if err != nil {
 		return nil, err
 	}

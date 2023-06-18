@@ -16,6 +16,7 @@ type Indexer interface {
 
 	Iterator(reverse bool) IndexrIterator
 	Size() int
+	Close() error
 }
 
 // generic IndexerIterator
@@ -37,15 +38,19 @@ type IndexType = int8
 const (
 	Btree IndexType = iota + 1
 	ART
+	BPTree
 )
 
 // init Indexer by IndexType
-func NewIndexr(typ IndexType, path string) Indexer {
+func NewIndexr(typ IndexType, path string, sync bool) Indexer {
 	switch typ {
 	case Btree:
 		return NewBTree()
 	case ART:
 		return NewART()
+	case BPTree:
+		return NewBPlusTree(path, sync)
+
 	default:
 		panic("unsupported idnex type")
 	}

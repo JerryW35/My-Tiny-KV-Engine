@@ -55,6 +55,9 @@ func (art *AdaptiveRadixTree) Size() int {
 	defer art.lock.RUnlock()
 	return art.tree.Size()
 }
+func (art *AdaptiveRadixTree) Close() error {
+	return nil
+}
 
 /*
 	ART Iterator

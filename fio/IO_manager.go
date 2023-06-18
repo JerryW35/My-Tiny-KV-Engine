@@ -15,7 +15,7 @@ type IOManager interface {
 	Size() (int64, error)
 }
 
-// init IO manager
+// InitIOManager init IO manager,support standard file system IO
 func InitIOManager(fileName string) (IOManager, error) {
 	return NewFileIOManager(fileName)
 }

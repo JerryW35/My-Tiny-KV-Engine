@@ -15,11 +15,6 @@ var indexBucketName = []byte("bitcask-index")
 type BPlusTree struct {
 	tree *bbolt.DB
 }
-type bptreeIterator struct {
-	tx      *bbolt.Tx
-	cursor  *bbolt.Cursor
-	reverse bool
-}
 
 func NewBPlusTree(path string, syncWrites bool) *BPlusTree {
 	config := bbolt.DefaultOptions
@@ -79,7 +74,7 @@ func (bpt *BPlusTree) Delete(key []byte) bool {
 }
 
 func (bpt *BPlusTree) Iterator(reverse bool) IndexrIterator {
-	return nil
+	return newBpTreeIterator(bpt.tree, reverse)
 }
 
 func (bpt *BPlusTree) Size() int {
@@ -93,18 +88,65 @@ func (bpt *BPlusTree) Size() int {
 	}
 	return size
 }
+func (bpt *BPlusTree) Close() error {
+	return bpt.tree.Close()
+}
 
 /*
 Iterator methods
 */
+
+type bptreeIterator struct {
+	tx       *bbolt.Tx
+	cursor   *bbolt.Cursor
+	reverse  bool
+	curKey   []byte
+	curValue []byte
+}
+
 func newBpTreeIterator(tree *bbolt.DB, reverse bool) *bptreeIterator {
 	tx, err := tree.Begin(false)
 	if err != nil {
 		panic("failed to begin a transaction")
 	}
 	return &bptreeIterator{
-		tx,
-		tx.Cursor(),
-		reverse,
+		tx:      tx,
+		cursor:  tx.Cursor(),
+		reverse: reverse,
 	}
+}
+
+func (bpi *bptreeIterator) Rewind() {
+	if bpi.reverse {
+		bpi.curKey, bpi.curValue = bpi.cursor.Last()
+	}
+	bpi.curKey, bpi.curValue = bpi.cursor.First()
+}
+
+func (bpi *bptreeIterator) Seek(key []byte) {
+	bpi.curKey, bpi.curValue = bpi.cursor.Seek(key)
+}
+
+func (bpi *bptreeIterator) Next() {
+	if bpi.reverse {
+		bpi.curKey, bpi.curValue = bpi.cursor.Prev()
+	} else {
+		bpi.curKey, bpi.curValue = bpi.cursor.Next()
+	}
+}
+
+func (bpi *bptreeIterator) Valid() bool {
+	return len(bpi.curKey) == 0
+}
+
+func (bpi *bptreeIterator) Key() []byte {
+	return bpi.curKey
+}
+
+func (bpi *bptreeIterator) Value() *data.LogRecordPos {
+	return data.DecodeLogRecordPos(bpi.curValue)
+}
+
+func (bpi *bptreeIterator) Close() {
+	_ = bpi.tx.Rollback()
 }
