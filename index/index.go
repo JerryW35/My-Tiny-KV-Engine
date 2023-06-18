@@ -40,12 +40,12 @@ const (
 )
 
 // init Indexer by IndexType
-func NewIndexr(typ IndexType) Indexer {
+func NewIndexr(typ IndexType, path string) Indexer {
 	switch typ {
 	case Btree:
 		return NewBTree()
 	case ART:
-		return nil
+		return NewART()
 	default:
 		panic("unsupported idnex type")
 	}

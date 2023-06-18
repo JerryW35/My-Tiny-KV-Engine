@@ -8,8 +8,9 @@ type Configs struct {
 	DirPath      string
 	DataFileSize int64
 	// whether it needs to do persistent on every write
-	SyncWrites  bool
-	IndexerType index.IndexType
+	SyncWrites     bool
+	IndexerType    index.IndexType
+	IndexerDirPath string
 }
 type IteratorConfigs struct {
 	Reverse bool

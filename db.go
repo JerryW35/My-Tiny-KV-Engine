@@ -12,8 +12,6 @@ import (
 	"sync"
 )
 
-// some APIs for the user
-
 type DB struct {
 	config     *Configs
 	mutex      *sync.RWMutex
@@ -129,7 +127,7 @@ func Open(configs Configs) (*DB, error) {
 		config:     &configs,
 		mutex:      new(sync.RWMutex),
 		olderFiles: make(map[uint32]*data.File),
-		index:      index.NewIndexr(configs.IndexerType),
+		index:      index.NewIndexr(configs.IndexerType, configs.IndexerDirPath),
 	}
 	// load merge files
 	if err := db.loadMergeFiles(); err != nil {

@@ -7,17 +7,10 @@ import (
 	"testing"
 )
 
-//func TestDB_ListKeys(t *testing.T) {
-//	seq := make([]byte, binary.MaxVarintLen64)
-//	n1 := binary.PutUvarint(seq[:], uint64(10))
-//	n2 := binary.PutUvarint(seq[n1:], uint64(20))
-//	t.Log(n1, n2)
-//
-//	//decode
-//	num1, n1 := binary.Uvarint(seq)
-//	num2, n2 := binary.Uvarint(seq[n1:])
-//	t.Log(num1, num2)
-//}
+func TestDB_ListKeys(t *testing.T) {
+	var ok bool
+	t.Log(ok)
+}
 
 // delete test files
 func destroyDB(db *DB) {
