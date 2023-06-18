@@ -14,4 +14,5 @@ var (
 	ErrorParse             = errors.New("the file name may be corrupted ")
 	ErrorExceedMaxBatchNum = errors.New("exceed max batch num")
 	ErrorIsMerging         = errors.New("the db is merging")
+	ErrorDataBaseIsInUse   = errors.New("the db is in use")
 )

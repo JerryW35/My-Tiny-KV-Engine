@@ -3,6 +3,7 @@ package KVstore
 import (
 	"KVstore/data"
 	"KVstore/index"
+	"github.com/gofrs/flock"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,6 +11,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+)
+
+const (
+	seqNoKey     = "seq_No"
+	fileLockName = "flock"
 )
 
 type DB struct {
@@ -21,6 +27,12 @@ type DB struct {
 	fileIds    []int // only used for loading index
 	seqNo      uint64
 	isMerging  bool
+	// when using b+ tree, if cannot get seqNo when loading,
+	// then we can't use WriteBatch
+	seqNoFileExist bool
+	isInitial      bool // used for write batch check
+	fileLock       *flock.Flock
+	BytesWrite     uint
 }
 
 /*
@@ -84,6 +96,7 @@ func (db *DB) Delete(key []byte) error {
 }
 func (db *DB) ListKeys() [][]byte {
 	iter := db.index.Iterator(false)
+	defer iter.Close()
 	keys := make([][]byte, db.index.Size())
 	var idx int
 	for iter.Rewind(); iter.Valid(); iter.Next() {
@@ -98,6 +111,7 @@ func (db *DB) Fold(fn func(key []byte, value []byte) bool) error {
 	db.mutex.RLock()
 	defer db.mutex.RUnlock()
 	iter := db.index.Iterator(false)
+	defer iter.Close()
 	for iter.Rewind(); iter.Valid(); iter.Next() {
 		val, err := db.getValueByPosition(iter.Value())
 		if err != nil {
@@ -117,17 +131,40 @@ func Open(configs Configs) (*DB, error) {
 		return nil, err
 	}
 	//check the dir, if not exist then create a new one
+	var isInitial bool
 	if _, err := os.Stat(configs.DirPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(configs.DirPath, os.ModePerm); err != nil {
 			return nil, err
 		}
+		isInitial = true
+	}
+	// check if DB is in use
+	fileLock := flock.New(filepath.Join(configs.DirPath, fileLockName))
+	hold, err := fileLock.TryLock()
+	if err != nil {
+		return nil, err
+	}
+	if !hold {
+		return nil, ErrorDataBaseIsInUse
+	}
+
+	entries, err := os.ReadDir(configs.DirPath)
+	if err != nil {
+		return nil, err
+	}
+	if len(entries) == 0 {
+		isInitial = true
 	}
 	//init DB structure
 	db := &DB{
 		config:     &configs,
 		mutex:      new(sync.RWMutex),
 		olderFiles: make(map[uint32]*data.File),
-		index:      index.NewIndexr(configs.IndexerType, configs.IndexerDirPath),
+		index: index.NewIndexr(configs.IndexerType,
+			configs.IndexerDirPath,
+			configs.SyncWrites),
+		isInitial: isInitial,
+		fileLock:  fileLock,
 	}
 	// load merge files
 	if err := db.loadMergeFiles(); err != nil {
@@ -137,22 +174,64 @@ func Open(configs Configs) (*DB, error) {
 	if err := db.loadFiles(); err != nil {
 		return nil, err
 	}
-	if err := db.loadIndexFromHint(); err != nil {
-		return nil, err
+	if configs.IndexerType != index.BPTree {
+		if err := db.loadIndexFromHint(); err != nil {
+			return nil, err
+		}
+		// load indexer
+		if err := db.loadIndexer(); err != nil {
+			return nil, err
+		}
 	}
-	// load indexer
-	if err := db.loadIndexer(); err != nil {
-		return nil, err
+	if configs.IndexerType == index.BPTree {
+		if err := db.loadSeqNo(); err != nil {
+			return nil, err
+		}
+		//set WriteOffset to the end of the file
+		if db.activeFile != nil {
+			size, err := db.activeFile.IOManager.Size()
+			if err != nil {
+				return nil, err
+			}
+			db.activeFile.WriteOffset = size
+		}
 	}
 	return db, nil
 }
 func (db *DB) Close() error {
+	defer func() {
+		// unlock fileLock
+		if err := db.fileLock.Unlock(); err != nil {
+			panic("unlock fileLock error")
+		}
+		// close indexer
+		err := db.index.Close()
+		if err != nil {
+			panic("failed to close index")
+		}
+	}()
 	if db.activeFile == nil {
 		return nil
 	}
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
 
+	// save the SeqNo
+	seqNoFile, err := data.OpenSeqNoFile(db.config.DirPath)
+	if err != nil {
+		return err
+	}
+	record := data.LogRecord{
+		Key:   []byte(seqNoKey),
+		Value: []byte(strconv.FormatUint(db.seqNo, 10)),
+	}
+	encRecord, _ := data.EncodeLogRecord(&record)
+	if err := seqNoFile.Write(encRecord); err != nil {
+		return err
+	}
+	if err := seqNoFile.Sync(); err != nil {
+		return err
+	}
 	// close active file
 	if err := db.activeFile.Close(); err != nil {
 		return err
@@ -213,11 +292,20 @@ func (db *DB) appendLogRecord(record *data.LogRecord) (*data.LogRecordPos, error
 	if err := db.activeFile.Write(encRecord); err != nil {
 		return nil, err
 	}
+	db.BytesWrite += uint(lens)
 	// check users want to persist
-	if db.config.SyncWrites {
+	var needSync = db.config.SyncWrites
+	if !needSync && db.config.BytesPerSync > 0 &&
+		db.BytesWrite >= db.config.BytesPerSync {
+		needSync = true
+	}
+
+	if needSync {
 		if err := db.activeFile.Sync(); err != nil {
 			return nil, err
 		}
+		// reset BytesWrite
+		db.BytesWrite = 0
 	}
 	pos := &data.LogRecordPos{
 		Fid:    db.activeFile.FileId,
@@ -401,4 +489,24 @@ func (db *DB) getValueByPosition(logRecordPos *data.LogRecordPos) ([]byte, error
 	}
 	return logRecord.Value, nil
 
+}
+func (db *DB) loadSeqNo() error {
+	fileName := filepath.Join(db.config.DirPath, data.SeqNoFileName)
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
+		return nil
+	}
+
+	seqNoFile, err := data.OpenSeqNoFile(db.config.DirPath)
+	if err != nil {
+		return err
+	}
+	record, _, err := seqNoFile.Read(0)
+	seqNo, err := strconv.ParseUint(string(record.Value), 10, 64)
+	if err != nil {
+		return err
+	}
+	db.seqNo = seqNo
+	db.seqNoFileExist = true
+
+	return os.Remove(fileName)
 }

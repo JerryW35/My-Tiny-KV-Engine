@@ -2,6 +2,7 @@ package KVstore
 
 import (
 	"KVstore/data"
+	"KVstore/index"
 	"encoding/binary"
 	"sync"
 	"sync/atomic"
@@ -19,6 +20,9 @@ const NonTxnSeqNo uint64 = 0
 var txnFinKey = []byte("txn-fin")
 
 func (db *DB) NewWriteBatch(config WriteBatchConfigs) *WriteBatch {
+	if db.config.IndexerType == index.BPTree && !db.seqNoFileExist && !db.isInitial {
+		panic("cannot use write batch,seq no file not exists")
+	}
 	return &WriteBatch{
 		configs:       config,
 		mutex:         new(sync.Mutex),

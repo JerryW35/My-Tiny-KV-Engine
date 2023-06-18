@@ -11,6 +11,8 @@ type Configs struct {
 	SyncWrites     bool
 	IndexerType    index.IndexType
 	IndexerDirPath string
+	// sync when write how many bytes, 0 means no sync
+	BytesPerSync uint
 }
 type IteratorConfigs struct {
 	Reverse bool
@@ -22,10 +24,12 @@ type WriteBatchConfigs struct {
 }
 
 var DefaultConfigs = Configs{
-	DirPath:      "./",
-	DataFileSize: 256 * 1024 * 1024, //256MB
-	SyncWrites:   false,
-	IndexerType:  index.Btree,
+	DirPath:        "./",
+	IndexerDirPath: "./",
+	DataFileSize:   256 * 1024 * 1024, //256MB
+	SyncWrites:     false,
+	IndexerType:    index.Btree,
+	BytesPerSync:   0,
 }
 var DefaultIteratorConfigs = IteratorConfigs{
 	Reverse: false,

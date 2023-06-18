@@ -162,7 +162,7 @@ func TestDB_Get(t *testing.T) {
 	assert.NotNil(t, val7)
 	assert.Equal(t, val3, val7)
 
-	val8, err := db.Get(utils.GetTestKey(33))
+	val8, err := db2.Get(utils.GetTestKey(33))
 	assert.Equal(t, 0, len(val8))
 	assert.Equal(t, ErrorKeyNotFound, err)
 }
@@ -271,5 +271,30 @@ func TestDB_Sync(t *testing.T) {
 	assert.Nil(t, err)
 
 	err = db.Sync()
+	assert.Nil(t, err)
+}
+func TestDB_FileLock(t *testing.T) {
+	opts := DefaultConfigs
+	dir, _ := os.MkdirTemp("./", "bitcask-go-filelock")
+	opts.DirPath = dir + "/"
+
+	db, err := Open(opts)
+	defer destroyDB(db)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	_, err = Open(opts)
+	assert.Equal(t, ErrorDataBaseIsInUse, err)
+
+	err = db.Close()
+	assert.Nil(t, err)
+	//
+	db2, err := Open(opts)
+	t.Log(err)
+	t.Log(db2)
+	assert.Nil(t, err)
+	assert.NotNil(t, db2)
+	err = db2.Close()
 	assert.Nil(t, err)
 }
