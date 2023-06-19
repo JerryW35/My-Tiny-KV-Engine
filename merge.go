@@ -2,6 +2,7 @@ package KVstore
 
 import (
 	"KVstore/data"
+	"KVstore/utils"
 	"io"
 	"os"
 	"path"
@@ -21,9 +22,31 @@ func (db *DB) Merge() error {
 	}
 	db.mutex.Lock()
 
+	// check if the db is merging
 	if db.isMerging {
 		db.mutex.Unlock()
 		return ErrorIsMerging
+	}
+
+	//check the ratio to dermine whether to merge
+	totalSizeUsed, err := utils.DirSize(db.config.DirPath)
+	if err != nil {
+		db.mutex.Unlock()
+		return err
+	}
+	if float32(db.reclaimSize)/float32(totalSizeUsed) < db.config.DataFileMergeRatio {
+		db.mutex.Unlock()
+		return ErrorMergeRationUnReached
+	}
+	//check if remained disk space is enough
+	totoalFreeSpace, err := utils.AvailableDiskSize()
+	if err != nil {
+		db.mutex.Unlock()
+		return err
+	}
+	if uint64(totalSizeUsed-db.reclaimSize) >= totoalFreeSpace {
+		db.mutex.Unlock()
+		return ErrorNoEnoughSpace
 	}
 
 	db.isMerging = true
@@ -164,7 +187,7 @@ func (db *DB) loadMergeFiles() error {
 		if entry.Name() == data.MergeFinishedFileName {
 			mergeFinished = true
 		}
-		if entry.Name() == data.SeqNoFileName {
+		if entry.Name() == fileLockName {
 			continue
 		}
 		mergeFileNames = append(mergeFileNames, entry.Name())
@@ -200,7 +223,6 @@ func (db *DB) loadMergeFiles() error {
 		}
 	}
 	return nil
-
 }
 
 func (db *DB) getNonMergeFileID(mergePath string) (uint32, error) {

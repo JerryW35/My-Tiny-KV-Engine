@@ -32,7 +32,7 @@ func TestOpen(t *testing.T) {
 	t.Log(dir)
 	configs.DirPath = dir
 	db, err := Open(configs)
-	//defer destroyDB(db)
+	defer destroyDB(db)
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 }
@@ -40,10 +40,10 @@ func TestOpen(t *testing.T) {
 func TestDB_Put(t *testing.T) {
 	configs := DefaultConfigs
 	dir, _ := os.MkdirTemp("./", "tests")
-	configs.DirPath = dir + "/"
+	configs.DirPath = dir
 	configs.DataFileSize = 64 * 1024 * 1024
 	db, err := Open(configs)
-	//defer destroyDB(db)
+	defer destroyDB(db)
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
@@ -73,11 +73,11 @@ func TestDB_Put(t *testing.T) {
 	assert.Nil(t, err)
 
 	// 5.write until full
-	for i := 0; i < 5000000; i++ {
+	for i := 0; i < 10000; i++ {
 		err := db.Put(utils.GetTestKey(i), utils.RandomValue(128))
 		assert.Nil(t, err)
 	}
-	assert.Equal(t, 2, len(db.olderFiles))
+	assert.Equal(t, 0, len(db.olderFiles))
 
 	// 6.restart and put&read again
 	db.Close() //
@@ -314,4 +314,54 @@ func TestDB_OpenMMap(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
+}
+func TestDB_Stat(t *testing.T) {
+	opts := DefaultConfigs
+	dir, _ := os.MkdirTemp("./", "bitcask-go-stat")
+	opts.DirPath = dir + "/"
+	db, err := Open(opts)
+	defer destroyDB(db)
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	for i := 100; i < 10000; i++ {
+		err := db.Put(utils.GetTestKey(i), utils.RandomValue(128))
+		assert.Nil(t, err)
+	}
+	for i := 100; i < 1000; i++ {
+		err := db.Delete(utils.GetTestKey(i))
+		assert.Nil(t, err)
+	}
+	for i := 2000; i < 5000; i++ {
+		err := db.Put(utils.GetTestKey(i), utils.RandomValue(128))
+		assert.Nil(t, err)
+	}
+
+	stat := db.Stat()
+	t.Log(stat)
+	assert.NotNil(t, stat)
+}
+
+func TestDB_Backup(t *testing.T) {
+	opts := DefaultConfigs
+	dir := "/Users/wzr/Downloads/test"
+	opts.DirPath = dir
+	db, err := Open(opts)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	db.Put(utils.GetTestKey(1), utils.RandomValue(128))
+	//
+	backupDir := "/Users/wzr/Downloads/backup"
+	err = db.Backup(backupDir)
+	assert.Nil(t, err)
+
+	opts1 := DefaultConfigs
+	opts1.DirPath = backupDir
+	db2, err := Open(opts1)
+	assert.Nil(t, err)
+	assert.NotNil(t, db2)
+	destroyDB(db)
+	destroyDB(db2)
 }

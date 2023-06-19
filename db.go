@@ -4,6 +4,7 @@ import (
 	"KVstore/data"
 	"KVstore/fio"
 	"KVstore/index"
+	"KVstore/utils"
 	"github.com/gofrs/flock"
 	"io"
 	"os"
@@ -34,11 +35,45 @@ type DB struct {
 	isInitial      bool // used for write batch check
 	fileLock       *flock.Flock
 	BytesWrite     uint
+	reclaimSize    int64 // how many bytes to reclaim
+}
+type Stat struct {
+	KeyNum          uint  // number of keys
+	DataFileNUm     uint  // number of data files
+	ReclaimableSize int64 // reclaimable size in bytes
+	DiskSize        int64 // disk size in bytes
 }
 
 /*
 APIs for user
 */
+func (db *DB) Backup(dir string) error {
+	//check backup dir
+	if dir[len(dir)-1] != '/' {
+		dir += "/"
+	}
+	db.mutex.Lock()
+	defer db.mutex.Unlock()
+	return utils.CopyDir(db.config.DirPath, dir, []string{fileLockName})
+}
+func (db *DB) Stat() *Stat {
+	db.mutex.RLock()
+	defer db.mutex.RUnlock()
+	var dataFiles = uint(len(db.olderFiles))
+	if db.activeFile != nil {
+		dataFiles++
+	}
+	dirSize, err := utils.DirSize(db.config.DirPath)
+	if err != nil {
+		panic("failed to get dir size")
+	}
+	return &Stat{
+		KeyNum:          uint(db.index.Size()),
+		DataFileNUm:     dataFiles,
+		ReclaimableSize: db.reclaimSize,
+		DiskSize:        dirSize,
+	}
+}
 func (db *DB) Put(key []byte, value []byte) error {
 	//check if the key is empty
 	if len(key) == 0 {
@@ -55,9 +90,8 @@ func (db *DB) Put(key []byte, value []byte) error {
 		return err
 	}
 	//update index
-	ok := db.index.Put(key, pos)
-	if !ok {
-		return ErrorUpdateIndex
+	if oldPos := db.index.Put(key, pos); oldPos != nil {
+		db.reclaimSize += int64(oldPos.Size)
 	}
 	return nil
 }
@@ -85,13 +119,19 @@ func (db *DB) Delete(key []byte) error {
 	}
 	//add a tombstone record
 	logRecord := data.LogRecord{Key: logRecordKeyWithSeqNo(key, NonTxnSeqNo), Type: data.DELETE}
-	_, err := db.appendLogRecordWithLock(&logRecord)
+	pos, err := db.appendLogRecordWithLock(&logRecord)
 	if err != nil {
 		return err
 	}
-	ok := db.index.Delete(key)
+	//add delete record to reclaim count
+	db.reclaimSize += int64(pos.Size)
+	oldPos, ok := db.index.Delete(key)
 	if !ok {
 		return ErrorUpdateIndex
+	}
+	if oldPos != nil {
+		db.reclaimSize += int64(oldPos.Size)
+
 	}
 	return nil
 }
@@ -127,7 +167,7 @@ func (db *DB) Fold(fn func(key []byte, value []byte) bool) error {
 
 func Open(configs Configs) (*DB, error) {
 	// firstly check the config
-	err := checkConfigs(configs)
+	err := checkConfigs(&configs)
 	if err != nil {
 		return nil, err
 	}
@@ -317,6 +357,7 @@ func (db *DB) appendLogRecord(record *data.LogRecord) (*data.LogRecordPos, error
 	pos := &data.LogRecordPos{
 		Fid:    db.activeFile.FileId,
 		Offset: writeOff,
+		Size:   uint32(lens),
 	}
 	return pos, nil
 }
@@ -395,14 +436,15 @@ func (db *DB) loadIndexer() error {
 	}
 
 	updateIndex := func(key []byte, typ data.RecordType, pos *data.LogRecordPos) {
-		var ok bool
+		var oldPos *data.LogRecordPos
 		if typ == data.DELETE {
-			ok = db.index.Delete(key)
+			oldPos, _ = db.index.Delete(key)
+			db.reclaimSize += int64(pos.Size)
 		} else {
-			ok = db.index.Put(key, pos)
+			oldPos = db.index.Put(key, pos)
 		}
-		if !ok {
-			panic("failed to update index at startup")
+		if oldPos != nil {
+			db.reclaimSize += int64(oldPos.Size)
 		}
 	}
 	// txn logs
@@ -436,6 +478,7 @@ func (db *DB) loadIndexer() error {
 			logRecordPos := data.LogRecordPos{
 				Fid:    file.FileId,
 				Offset: offset,
+				Size:   uint32(lens),
 			}
 			//update indexer
 			//get key and SeqNo
@@ -468,12 +511,18 @@ func (db *DB) loadIndexer() error {
 	db.seqNo = curSeqNo
 	return nil
 }
-func checkConfigs(config Configs) error {
+func checkConfigs(config *Configs) error {
 	if config.DirPath == "" {
 		return ConfigErrorDBDirEmpty
 	}
 	if config.DataFileSize <= 0 {
 		return ConfigErrorSize
+	}
+	if config.DataFileMergeRatio <= 0 || config.DataFileMergeRatio > 1 {
+		return ConfigErrorMergeRatio
+	}
+	if config.DirPath[len(config.DirPath)-1] != '/' {
+		config.DirPath += "/"
 	}
 	return nil
 }
