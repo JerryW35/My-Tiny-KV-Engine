@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestDB_ListKeys(t *testing.T) {
@@ -38,11 +39,11 @@ func TestOpen(t *testing.T) {
 
 func TestDB_Put(t *testing.T) {
 	configs := DefaultConfigs
-	dir, _ := os.MkdirTemp("", "tests")
+	dir, _ := os.MkdirTemp("./", "tests")
 	configs.DirPath = dir + "/"
 	configs.DataFileSize = 64 * 1024 * 1024
 	db, err := Open(configs)
-	defer destroyDB(db)
+	//defer destroyDB(db)
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
@@ -72,7 +73,7 @@ func TestDB_Put(t *testing.T) {
 	assert.Nil(t, err)
 
 	// 5.write until full
-	for i := 0; i < 1000000; i++ {
+	for i := 0; i < 5000000; i++ {
 		err := db.Put(utils.GetTestKey(i), utils.RandomValue(128))
 		assert.Nil(t, err)
 	}
@@ -297,4 +298,20 @@ func TestDB_FileLock(t *testing.T) {
 	assert.NotNil(t, db2)
 	err = db2.Close()
 	assert.Nil(t, err)
+}
+
+// 5000000 data 12 files in total
+// false : 50s
+// true:	7s
+func TestDB_OpenMMap(t *testing.T) {
+	opts := DefaultConfigs
+	opts.DirPath = "/Users/wzr/Desktop/KVstore/tests2195224528/"
+	opts.MMapLoad = true
+
+	now := time.Now()
+	db, err := Open(opts)
+	t.Log("open time ", time.Since(now))
+
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
 }

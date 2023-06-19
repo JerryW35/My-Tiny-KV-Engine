@@ -2,6 +2,7 @@ package KVstore
 
 import (
 	"KVstore/data"
+	"KVstore/fio"
 	"KVstore/index"
 	"github.com/gofrs/flock"
 	"io"
@@ -182,6 +183,12 @@ func Open(configs Configs) (*DB, error) {
 		if err := db.loadIndexer(); err != nil {
 			return nil, err
 		}
+		// reset IOManager Type  to standard IO
+		if db.config.MMapLoad {
+			if err := db.resetIOType(); err != nil {
+				return nil, err
+			}
+		}
 	}
 	if configs.IndexerType == index.BPTree {
 		if err := db.loadSeqNo(); err != nil {
@@ -323,7 +330,7 @@ func (db *DB) setActivateFile() error {
 		initialFileId = db.activeFile.FileId + 1
 	}
 	// open a new file
-	dataFile, err := data.OpenFile(db.config.DirPath, initialFileId)
+	dataFile, err := data.OpenFile(db.config.DirPath, initialFileId, fio.StandardIO)
 	if err != nil {
 		return err
 	}
@@ -353,7 +360,11 @@ func (db *DB) loadFiles() error {
 	db.fileIds = fileIds
 	//loop all files and open the files
 	for i, id := range fileIds {
-		dataFile, err := data.OpenFile(db.config.DirPath, uint32(id))
+		ioType := fio.StandardIO
+		if db.config.MMapLoad {
+			ioType = fio.MemoryMappedIO
+		}
+		dataFile, err := data.OpenFile(db.config.DirPath, uint32(id), ioType)
 		if err != nil {
 			return err
 		}
@@ -509,4 +520,18 @@ func (db *DB) loadSeqNo() error {
 	db.seqNoFileExist = true
 
 	return os.Remove(fileName)
+}
+func (db *DB) resetIOType() error {
+	if db.activeFile == nil {
+		return nil
+	}
+	if err := db.activeFile.SetIOType(db.config.DirPath, fio.StandardIO); err != nil {
+		return err
+	}
+	for _, file := range db.olderFiles {
+		if err := file.SetIOType(db.config.DirPath, fio.StandardIO); err != nil {
+			return err
+		}
+	}
+	return nil
 }

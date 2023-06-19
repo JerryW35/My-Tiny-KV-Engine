@@ -13,6 +13,7 @@ type Configs struct {
 	IndexerDirPath string
 	// sync when write how many bytes, 0 means no sync
 	BytesPerSync uint
+	MMapLoad     bool
 }
 type IteratorConfigs struct {
 	Reverse bool
@@ -30,6 +31,7 @@ var DefaultConfigs = Configs{
 	SyncWrites:     false,
 	IndexerType:    index.Btree,
 	BytesPerSync:   0,
+	MMapLoad:       true,
 }
 var DefaultIteratorConfigs = IteratorConfigs{
 	Reverse: false,
