@@ -47,11 +47,9 @@ func NewIndexr(typ IndexType, path string, sync bool) Indexer {
 	case Btree:
 		return NewBTree()
 	case ART:
-		//return NewART()
-		return nil
+		return NewART()
 	case BPTree:
-		return nil
-		//return NewBPlusTree(path, sync)
+		return NewBPlusTree(path, sync)
 
 	default:
 		panic("unsupported idnex type")

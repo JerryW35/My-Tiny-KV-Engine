@@ -21,6 +21,7 @@ const maxLogRecordHeaderSize = 15
 type LogRecordPos struct {
 	Fid    uint32 // file id, represent which file the data is in
 	Offset int64
+	Size   uint32
 }
 type LogRecord struct {
 	Key   []byte
@@ -97,19 +98,22 @@ func getCRC(log *LogRecord, header []byte) uint32 {
 
 // Encode LogRecordPos
 func EncodeLogRecordPos(pos *LogRecordPos) []byte {
-	buf := make([]byte, binary.MaxVarintLen64+binary.MaxVarintLen32)
+	buf := make([]byte, binary.MaxVarintLen64+binary.MaxVarintLen32*2)
 	var index = 0
 	index += binary.PutVarint(buf[index:], int64(pos.Fid))
 	index += binary.PutVarint(buf[index:], pos.Offset)
+	index += binary.PutVarint(buf[index:], int64(pos.Size))
 	return buf[:index]
 }
 
 // Decode LogRecordPos
 func DecodeLogRecordPos(buf []byte) *LogRecordPos {
-	fileId, n := binary.Varint(buf[0:])
-	offset, n := binary.Varint(buf[n:])
+	fileId, n1 := binary.Varint(buf[0:])
+	offset, n2 := binary.Varint(buf[n1:])
+	size, _ := binary.Varint(buf[n1+n2:])
 	return &LogRecordPos{
 		Fid:    uint32(fileId),
 		Offset: offset,
+		Size:   uint32(size),
 	}
 }
