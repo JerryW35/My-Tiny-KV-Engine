@@ -1,6 +1,15 @@
 package fio
 
-const DataFilePerm = 0644
+const (
+	DataFilePerm = 0644
+)
+
+type FileIOTypes byte
+
+const (
+	StandardIO FileIOTypes = iota
+	MemoryMappedIO
+)
 
 // IOManager is the interface for file IO, can be implemented by different file IO strategy
 type IOManager interface {
@@ -16,6 +25,13 @@ type IOManager interface {
 }
 
 // InitIOManager init IO manager,support standard file system IO
-func InitIOManager(fileName string) (IOManager, error) {
-	return NewFileIOManager(fileName)
+func InitIOManager(fileName string, ioType FileIOTypes) (IOManager, error) {
+	switch ioType {
+	case StandardIO:
+		return NewFileIOManager(fileName)
+	case MemoryMappedIO:
+		return NewMMapIOManager(fileName)
+	default:
+		panic("not supported io type")
+	}
 }

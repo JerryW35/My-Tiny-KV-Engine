@@ -1,27 +1,28 @@
 package data
 
 import (
+	"KVstore/fio"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
 )
 
 func TestOpenDataFile(t *testing.T) {
-	dataFile1, err := OpenFile(os.TempDir(), 0)
+	dataFile1, err := OpenFile(os.TempDir(), 0, fio.StandardIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, dataFile1)
 
-	dataFile2, err := OpenFile(os.TempDir(), 111)
+	dataFile2, err := OpenFile(os.TempDir(), 111, fio.StandardIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, dataFile2)
 
-	dataFile3, err := OpenFile(os.TempDir(), 111)
+	dataFile3, err := OpenFile(os.TempDir(), 111, fio.StandardIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, dataFile3)
 }
 
 func TestDataFile_Write(t *testing.T) {
-	dataFile, err := OpenFile(os.TempDir(), 0)
+	dataFile, err := OpenFile(os.TempDir(), 0, fio.StandardIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, dataFile)
 
@@ -36,7 +37,7 @@ func TestDataFile_Write(t *testing.T) {
 }
 
 func TestDataFile_Close(t *testing.T) {
-	dataFile, err := OpenFile(os.TempDir(), 123)
+	dataFile, err := OpenFile(os.TempDir(), 123, fio.StandardIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, dataFile)
 
@@ -48,7 +49,7 @@ func TestDataFile_Close(t *testing.T) {
 }
 
 func TestDataFile_Sync(t *testing.T) {
-	dataFile, err := OpenFile(os.TempDir(), 456)
+	dataFile, err := OpenFile(os.TempDir(), 456, fio.StandardIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, dataFile)
 
@@ -59,7 +60,7 @@ func TestDataFile_Sync(t *testing.T) {
 	assert.Nil(t, err)
 }
 func TestDataFile_ReadLogRecord(t *testing.T) {
-	dataFile, err := OpenFile(os.TempDir(), 6666)
+	dataFile, err := OpenFile(os.TempDir(), 6666, fio.StandardIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, dataFile)
 

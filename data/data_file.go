@@ -24,29 +24,29 @@ type File struct {
 	IOManager   fio.IOManager
 }
 
-func OpenFile(dirPath string, fileId uint32) (*File, error) {
+func OpenFile(dirPath string, fileId uint32, ioType fio.FileIOTypes) (*File, error) {
 	fileName := GetDataFileName(dirPath, fileId)
-	return NewDataFile(fileName, fileId)
+	return NewDataFile(fileName, fileId, ioType)
 }
 
 // OpenHintFile open hint file
 func OpenHintFile(dirPath string) (*File, error) {
 	fileName := filepath.Join(dirPath, HintFileName)
-	return NewDataFile(fileName, 0)
+	return NewDataFile(fileName, 0, fio.StandardIO)
 }
 func OpenMergeFinishedFile(dirPath string) (*File, error) {
 	fileName := filepath.Join(dirPath, MergeFinishedFileName)
-	return NewDataFile(fileName, 0)
+	return NewDataFile(fileName, 0, fio.StandardIO)
 }
 func OpenSeqNoFile(dirPath string) (*File, error) {
 	fileName := filepath.Join(dirPath, SeqNoFileName)
-	return NewDataFile(fileName, 0)
+	return NewDataFile(fileName, 0, fio.StandardIO)
 }
 func GetDataFileName(dir string, fileId uint32) string {
 	return filepath.Join(dir + fmt.Sprintf("%09d", fileId) + FileSuffix)
 }
-func NewDataFile(fileName string, fileId uint32) (*File, error) {
-	ioManager, err := fio.InitIOManager(fileName)
+func NewDataFile(fileName string, fileId uint32, ioType fio.FileIOTypes) (*File, error) {
+	ioManager, err := fio.InitIOManager(fileName, ioType)
 	if err != nil {
 		return nil, err
 	}
@@ -138,4 +138,15 @@ func (file *File) readNBytes(n int64, offset int64) (b []byte, err error) {
 	b = make([]byte, n)
 	_, err = file.IOManager.Read(b, offset)
 	return b, nil
+}
+func (file *File) SetIOType(dirPath string, ioType fio.FileIOTypes) error {
+	if err := file.IOManager.Close(); err != nil {
+		return err
+	}
+	ioM, err := fio.InitIOManager(GetDataFileName(dirPath, file.FileId), ioType)
+	if err != nil {
+		return err
+	}
+	file.IOManager = ioM
+	return nil
 }
