@@ -31,7 +31,7 @@ var DefaultConfigs = Configs{
 	SyncWrites:     false,
 	IndexerType:    index.Btree,
 	BytesPerSync:   0,
-	MMapLoad:       true,
+	MMapLoad:       false, //whether use mmap to load data file
 }
 var DefaultIteratorConfigs = IteratorConfigs{
 	Reverse: false,

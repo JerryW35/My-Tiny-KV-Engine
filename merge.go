@@ -190,6 +190,9 @@ func (db *DB) loadMergeFiles() error {
 	}
 	// move new data file to dir
 	for _, fileName := range mergeFileNames {
+		if fileName == fileLockName {
+			continue
+		}
 		srcPath := filepath.Join(mergePath, fileName)
 		destPath := filepath.Join(db.config.DirPath, fileName)
 		if err := os.Rename(srcPath, destPath); err != nil {

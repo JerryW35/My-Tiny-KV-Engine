@@ -8,11 +8,11 @@ import (
 
 type Indexer interface {
 	// Put the key and the location of the data
-	Put(key []byte, pos *data.LogRecordPos) bool
+	Put(key []byte, pos *data.LogRecordPos) *data.LogRecordPos
 	// Get the location of the data by the key
 	Get(key []byte) *data.LogRecordPos
 	// Delete the item by the key
-	Delete(key []byte) bool
+	Delete(key []byte) (*data.LogRecordPos, bool)
 
 	Iterator(reverse bool) IndexrIterator
 	Size() int
@@ -47,9 +47,11 @@ func NewIndexr(typ IndexType, path string, sync bool) Indexer {
 	case Btree:
 		return NewBTree()
 	case ART:
-		return NewART()
+		//return NewART()
+		return nil
 	case BPTree:
-		return NewBPlusTree(path, sync)
+		return nil
+		//return NewBPlusTree(path, sync)
 
 	default:
 		panic("unsupported idnex type")
