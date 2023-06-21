@@ -31,7 +31,7 @@ var DefaultConfigs = Configs{
 	IndexerDirPath:     "./",
 	DataFileSize:       256 * 1024 * 1024, //256MB
 	SyncWrites:         false,
-	IndexerType:        index.Btree,
+	IndexerType:        index.ART,
 	BytesPerSync:       0,
 	MMapLoad:           false, //whether use mmap to load data file
 	DataFileMergeRatio: 0.5,
