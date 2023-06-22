@@ -29,6 +29,24 @@ type SetInternalKey struct {
 	version int64
 	member  []byte
 }
+type ListInternalKey struct {
+	key     []byte
+	version int64
+	index   uint64
+}
+
+func (list *ListInternalKey) encode() []byte {
+	buf := make([]byte, len(list.key)+8+8)
+	//key
+	var index = 0
+	index += copy(buf[index:], list.key)
+	//version
+	binary.LittleEndian.PutUint64(buf[index:], uint64(list.version))
+	index += 8
+	//index
+	binary.LittleEndian.PutUint64(buf[index:], list.index)
+	return buf
+}
 
 func (meta *metadata) encodeMetaData() []byte {
 	var size = maxMetaDataSize

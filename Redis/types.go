@@ -266,3 +266,80 @@ func (rds *RedisDataStructure) SRem(key, member []byte) (bool, error) {
 }
 
 // =============================List================================
+func (rds *RedisDataStructure) LPush(key, element []byte) (uint32, error) {
+	return rds.pushInner(key, element, true)
+}
+func (rds *RedisDataStructure) RPush(key, element []byte) (uint32, error) {
+	return rds.pushInner(key, element, false)
+}
+func (rds *RedisDataStructure) LPop(key []byte) ([]byte, error) {
+	return rds.popInner(key, true)
+}
+func (rds *RedisDataStructure) RPop(key []byte) ([]byte, error) {
+	return rds.popInner(key, false)
+}
+func (rds *RedisDataStructure) pushInner(key, element []byte, isLeft bool) (uint32, error) {
+	//find meta data
+	meta, err := rds.findMetaData(key, List)
+	if err != nil {
+		return 0, err
+	}
+
+	//construct Internal key
+	listKey := &ListInternalKey{
+		key:     key,
+		version: meta.version,
+	}
+	if isLeft {
+		listKey.index = meta.head - 1
+	} else {
+		listKey.index = meta.tail
+	}
+	wb := rds.db.NewWriteBatch(KVstore.DefaultWriteBatchConfigs)
+	meta.size++
+	if isLeft {
+		meta.head--
+	} else {
+		meta.tail++
+	}
+	_ = wb.Put(key, meta.encodeMetaData())
+	_ = wb.Put(listKey.encode(), element)
+	if err = wb.Commit(); err != nil {
+		return 0, err
+	}
+	return meta.size, nil
+}
+func (rds *RedisDataStructure) popInner(key []byte, isLeft bool) ([]byte, error) {
+	//find meta data
+	meta, err := rds.findMetaData(key, List)
+	if err != nil {
+		return nil, err
+	}
+	if meta.size == 0 {
+		return nil, nil
+	}
+	//construct Internal key
+	listKey := &ListInternalKey{
+		key:     key,
+		version: meta.version,
+	}
+	if isLeft {
+		listKey.index = meta.head
+	} else {
+		listKey.index = meta.tail - 1
+	}
+	element, err := rds.db.Get(listKey.encode())
+	if err != nil {
+		return nil, err
+	}
+	meta.size--
+	if isLeft {
+		meta.head++
+	} else {
+		meta.tail--
+	}
+	if err = rds.db.Put(key, meta.encodeMetaData()); err != nil {
+		return nil, err
+	}
+	return element, nil
+}
