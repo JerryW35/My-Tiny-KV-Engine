@@ -187,3 +187,82 @@ func (rds *RedisDataStructure) findMetaData(key []byte, dataType redisDataType) 
 	}
 	return meta, nil
 }
+
+// =============================Set================================
+func (rds *RedisDataStructure) SAdd(key, member []byte) (bool, error) {
+	// find meta data
+	meta, err := rds.findMetaData(key, Set)
+	if err != nil {
+		return false, err
+	}
+	// construct key
+	setKey := &SetInternalKey{
+		key:     key,
+		member:  member,
+		version: meta.version,
+	}
+	var ok bool
+	if _, err = rds.db.Get(setKey.encode()); err == KVstore.ErrorKeyNotFound {
+		wb := rds.db.NewWriteBatch(KVstore.DefaultWriteBatchConfigs)
+		meta.size++
+		_ = wb.Put(key, meta.encodeMetaData())
+		_ = wb.Put(setKey.encode(), nil)
+		if err = wb.Commit(); err != nil {
+			return false, err
+		}
+		ok = true
+	}
+	return ok, nil
+}
+func (rds *RedisDataStructure) SIsMember(key, member []byte) (bool, error) {
+	meta, err := rds.findMetaData(key, Set)
+	if err != nil {
+		return false, err
+	}
+	if meta.size == 0 {
+		return false, nil
+	}
+	// construct key
+	setKey := &SetInternalKey{
+		key:     key,
+		member:  member,
+		version: meta.version,
+	}
+	_, err = rds.db.Get(setKey.encode())
+	if err != nil && err != KVstore.ErrorKeyNotFound {
+		return false, err
+	}
+	if err == KVstore.ErrorKeyNotFound {
+		return false, nil
+	}
+	return true, nil
+}
+func (rds *RedisDataStructure) SRem(key, member []byte) (bool, error) {
+	meta, err := rds.findMetaData(key, Set)
+	if err != nil {
+		return false, err
+	}
+	if meta.size == 0 {
+		return false, nil
+	}
+	// construct key
+	setKey := &SetInternalKey{
+		key:     key,
+		member:  member,
+		version: meta.version,
+	}
+	if _, err = rds.db.Get(setKey.encode()); err == KVstore.ErrorKeyNotFound {
+		return false, nil
+	}
+	//update
+	wb := rds.db.NewWriteBatch(KVstore.DefaultWriteBatchConfigs)
+	meta.size--
+	_ = wb.Put(key, meta.encodeMetaData())
+	_ = wb.Delete(setKey.encode())
+	if err = wb.Commit(); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// =============================List================================

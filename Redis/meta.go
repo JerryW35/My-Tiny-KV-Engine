@@ -24,6 +24,11 @@ type hashInternalKey struct {
 	version int64
 	field   []byte
 }
+type SetInternalKey struct {
+	key     []byte
+	version int64
+	member  []byte
+}
 
 func (meta *metadata) encodeMetaData() []byte {
 	var size = maxMetaDataSize
@@ -79,6 +84,25 @@ func (hashkey *hashInternalKey) encode() []byte {
 
 	// field
 	copy(buf[index:], hashkey.field)
+
+	return buf
+}
+func (setKey *SetInternalKey) encode() []byte {
+	buf := make([]byte, len(setKey.key)+len(setKey.member)+8+4)
+	// key
+	var index = 0
+	copy(buf[index:index+len(setKey.key)], setKey.key)
+	index += len(setKey.key)
+
+	// version
+	binary.LittleEndian.PutUint64(buf[index:index+8], uint64(setKey.version))
+	index += 8
+
+	// member
+	copy(buf[index:index+len(setKey.member)], setKey.member)
+	index += len(setKey.member)
+	//member Size
+	binary.LittleEndian.PutUint32(buf[index:], uint32(len(setKey.member)))
 
 	return buf
 }
