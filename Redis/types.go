@@ -73,3 +73,117 @@ func (rds *RedisDataStructure) Get(key []byte) ([]byte, error) {
 	}
 	return encValue[index:], nil
 }
+
+// =============================Hash================================
+func (rds *RedisDataStructure) HSet(key, field, value []byte) (bool, error) {
+	meta, err := rds.findMetaData(key, Hash)
+	if err != nil {
+		return false, err
+	}
+	hk := &hashInternalKey{
+		key:     key,
+		version: meta.version,
+		field:   field,
+	}
+	encKey := hk.encode()
+	// return true if field not exist else false
+	//find whether exists
+	var exist = true
+	if _, err := rds.db.Get(encKey); err == KVstore.ErrorKeyNotFound {
+		exist = false
+	}
+	wb := rds.db.NewWriteBatch(KVstore.DefaultWriteBatchConfigs)
+	//if not exist, update metadata
+	if !exist {
+		meta.size++
+		_ = wb.Put(key, meta.encodeMetaData())
+	}
+	err = wb.Put(encKey, value)
+	if err = wb.Commit(); err != nil {
+		return false, err
+	}
+	return !exist, nil
+}
+func (rds *RedisDataStructure) HGet(key, field []byte) ([]byte, error) {
+	meta, err := rds.findMetaData(key, Hash)
+	if err != nil {
+		return nil, err
+	}
+	if meta.size == 0 {
+		return nil, nil
+	}
+	hk := &hashInternalKey{
+		key:     key,
+		version: meta.version,
+		field:   field,
+	}
+	return rds.db.Get(hk.encode())
+
+}
+func (rds *RedisDataStructure) HDel(key, field []byte) (bool, error) {
+	meta, err := rds.findMetaData(key, Hash)
+	if err != nil {
+		return false, err
+	}
+	if meta.size == 0 {
+		return false, nil
+	}
+	hk := &hashInternalKey{
+		key:     key,
+		version: meta.version,
+		field:   field,
+	}
+	encKey := hk.encode()
+	//check if exists
+	var exist = true
+	if _, err = rds.db.Get(encKey); err == KVstore.ErrorKeyNotFound {
+		exist = false
+	}
+	if exist {
+		wb := rds.db.NewWriteBatch(KVstore.DefaultWriteBatchConfigs)
+		meta.size--
+		_ = wb.Put(key, meta.encodeMetaData())
+		_ = wb.Delete(encKey)
+		if err = wb.Commit(); err != nil {
+			return false, err
+		}
+	}
+	return exist, nil
+}
+func (rds *RedisDataStructure) findMetaData(key []byte, dataType redisDataType) (*metadata, error) {
+	metaBuf, err := rds.db.Get(key)
+	if err != nil && err != KVstore.ErrorKeyNotFound {
+		return nil, err
+	}
+	// do some check
+	var meta *metadata
+	var exist = true
+	if err == KVstore.ErrorKeyNotFound {
+		exist = false
+	} else {
+		// exist, check the type
+		meta = decodeMetaData(metaBuf)
+		if meta.dataType != dataType {
+			return nil, ErrWrongTypeOperation
+		}
+		//check expire
+		if meta.expire != 0 && meta.expire <= time.Now().UnixNano() {
+			exist = false
+		}
+	}
+
+	// init
+	if !exist {
+		meta = &metadata{
+			dataType: dataType,
+			expire:   0,
+			version:  time.Now().UnixNano(),
+			size:     0,
+		}
+		if dataType == List {
+			meta.head = initialListMark
+			meta.tail = initialListMark
+		}
+	}
+	return meta, nil
+}
