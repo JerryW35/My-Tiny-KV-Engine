@@ -14,7 +14,7 @@ func TestRedisDataStructure_Get(t *testing.T) {
 	dir, _ := os.MkdirTemp("", "bitcask-go-redis-get")
 	t.Log(dir)
 	configs.DirPath = dir
-	rds, err := newRedisDataStructure(configs)
+	rds, err := NewRedisDataStructure(configs)
 	assert.Nil(t, err)
 
 	err = rds.Set(utils.GetTestKey(1), 0, utils.RandomValue(100))
@@ -35,7 +35,7 @@ func TestRedisDataStructure_Get(t *testing.T) {
 }
 func TestRedisDataStructure_Del_Type(t *testing.T) {
 	opts := KVstore.DefaultConfigs
-	rds, err := newRedisDataStructure(opts)
+	rds, err := NewRedisDataStructure(opts)
 	assert.Nil(t, err)
 
 	// del
@@ -59,7 +59,7 @@ func TestRedisDataStructure_Del_Type(t *testing.T) {
 
 func TestRedisDataStructure_HGet(t *testing.T) {
 	config := KVstore.DefaultConfigs
-	rds, err := newRedisDataStructure(config)
+	rds, err := NewRedisDataStructure(config)
 	assert.Nil(t, err)
 
 	ok1, err := rds.HSet(utils.GetTestKey(1), []byte("field1"), utils.RandomValue(100))
@@ -90,7 +90,7 @@ func TestRedisDataStructure_HGet(t *testing.T) {
 
 func TestRedisDataStructure_HDel(t *testing.T) {
 	config := KVstore.DefaultConfigs
-	rds, err := newRedisDataStructure(config)
+	rds, err := NewRedisDataStructure(config)
 	assert.Nil(t, err)
 
 	del1, err := rds.HDel(utils.GetTestKey(200), nil)
@@ -117,7 +117,7 @@ func TestRedisDataStructure_HDel(t *testing.T) {
 }
 func TestRedisDataStructure_SIsMember(t *testing.T) {
 	config := KVstore.DefaultConfigs
-	rds, err := newRedisDataStructure(config)
+	rds, err := NewRedisDataStructure(config)
 	assert.Nil(t, err)
 
 	ok, err := rds.SAdd(utils.GetTestKey(1), []byte("val-1"))
@@ -146,7 +146,7 @@ func TestRedisDataStructure_SIsMember(t *testing.T) {
 
 func TestRedisDataStructure_LPop(t *testing.T) {
 	config := KVstore.DefaultConfigs
-	rds, err := newRedisDataStructure(config)
+	rds, err := NewRedisDataStructure(config)
 	assert.Nil(t, err)
 
 	res, err := rds.LPush(utils.GetTestKey(1), []byte("val-1"))
@@ -172,7 +172,7 @@ func TestRedisDataStructure_LPop(t *testing.T) {
 
 func TestRedisDataStructure_RPop(t *testing.T) {
 	config := KVstore.DefaultConfigs
-	rds, err := newRedisDataStructure(config)
+	rds, err := NewRedisDataStructure(config)
 	assert.Nil(t, err)
 
 	res, err := rds.RPush(utils.GetTestKey(1), []byte("val-1"))
@@ -197,7 +197,7 @@ func TestRedisDataStructure_RPop(t *testing.T) {
 }
 func TestRedisDataStructure_ZScore(t *testing.T) {
 	config := KVstore.DefaultConfigs
-	rds, err := newRedisDataStructure(config)
+	rds, err := NewRedisDataStructure(config)
 	assert.Nil(t, err)
 	ok, err := rds.ZAdd(utils.GetTestKey(1), 123, []byte("val-1"))
 	assert.Nil(t, err)

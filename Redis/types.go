@@ -26,12 +26,15 @@ type RedisDataStructure struct {
 	db *KVstore.DB
 }
 
-func newRedisDataStructure(configs KVstore.Configs) (*RedisDataStructure, error) {
+func NewRedisDataStructure(configs KVstore.Configs) (*RedisDataStructure, error) {
 	db, err := KVstore.Open(configs)
 	if err != nil {
 		return nil, err
 	}
 	return &RedisDataStructure{db: db}, nil
+}
+func (rds *RedisDataStructure) Close() error {
+	return rds.db.Close()
 }
 
 // =============================String================================
