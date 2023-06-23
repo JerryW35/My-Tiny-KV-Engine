@@ -2,6 +2,7 @@ package Redis
 
 import (
 	"KVstore"
+	"KVstore/utils"
 	"encoding/binary"
 	"errors"
 	"time"
@@ -342,4 +343,72 @@ func (rds *RedisDataStructure) popInner(key []byte, isLeft bool) ([]byte, error)
 		return nil, err
 	}
 	return element, nil
+}
+
+// =============================Sorted Set================================
+func (rds *RedisDataStructure) ZAdd(key []byte, score float64, member []byte) (bool, error) {
+	meta, err := rds.findMetaData(key, ZSet)
+	if err != nil {
+		return false, err
+	}
+	zk := &zsetInternalKey{
+		key:     key,
+		version: meta.version,
+		score:   score,
+		member:  member,
+	}
+	var exsit = true
+	value, err := rds.db.Get(zk.encode())
+	if err != nil && err != KVstore.ErrorKeyNotFound {
+		return false, err
+	}
+	if err == KVstore.ErrorKeyNotFound {
+		exsit = false
+	}
+	if exsit {
+		if score == utils.FloatFromBytes(value) {
+			return false, nil
+		}
+	}
+	//update meta data
+	wb := rds.db.NewWriteBatch(KVstore.DefaultWriteBatchConfigs)
+	if !exsit {
+		meta.size++
+		_ = wb.Put(key, meta.encodeMetaData())
+	}
+	if exsit {
+		oldKey := &zsetInternalKey{
+			key:     key,
+			version: meta.version,
+			member:  member,
+			score:   utils.FloatFromBytes(value),
+		}
+		_ = wb.Delete(oldKey.encodeWithScore())
+	}
+	// two parts need to be saved
+	_ = wb.Put(zk.encode(), utils.Float64ToBytes(score))
+	_ = wb.Put(zk.encodeWithScore(), nil)
+	if err = wb.Commit(); err != nil {
+		return false, err
+	}
+	return !exsit, nil
+}
+func (rds *RedisDataStructure) ZScore(key []byte, member []byte) (float64, error) {
+	meta, err := rds.findMetaData(key, ZSet)
+	if err != nil {
+		return -1, err
+	}
+	if meta.size == 0 {
+		return -1, err
+	}
+	zk := &zsetInternalKey{
+		key:     key,
+		version: meta.version,
+		member:  member,
+	}
+	value, err := rds.db.Get(zk.encode())
+	if err != nil {
+		return -1, err
+	}
+	return utils.FloatFromBytes(value), nil
 }

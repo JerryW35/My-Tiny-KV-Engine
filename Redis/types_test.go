@@ -195,3 +195,21 @@ func TestRedisDataStructure_RPop(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, val)
 }
+func TestRedisDataStructure_ZScore(t *testing.T) {
+	config := KVstore.DefaultConfigs
+	rds, err := newRedisDataStructure(config)
+	assert.Nil(t, err)
+	ok, err := rds.ZAdd(utils.GetTestKey(1), 123, []byte("val-1"))
+	assert.Nil(t, err)
+	assert.True(t, ok)
+	ok, err = rds.ZAdd(utils.GetTestKey(1), 456, []byte("val-2"))
+	assert.Nil(t, err)
+	assert.True(t, ok)
+	ok, err = rds.ZAdd(utils.GetTestKey(1), 789, []byte("val-2"))
+	assert.Nil(t, err)
+	assert.False(t, ok)
+	//ZScore
+	score, err := rds.ZScore(utils.GetTestKey(1), []byte("val-2"))
+	assert.Nil(t, err)
+	assert.Equal(t, float64(789), score)
+}

@@ -1,6 +1,7 @@
 package Redis
 
 import (
+	"KVstore/utils"
 	"encoding/binary"
 	"math"
 )
@@ -33,6 +34,53 @@ type ListInternalKey struct {
 	key     []byte
 	version int64
 	index   uint64
+}
+type zsetInternalKey struct {
+	key     []byte
+	version int64
+	member  []byte
+	score   float64
+}
+
+func (zset *zsetInternalKey) encode() []byte {
+
+	buf := make([]byte, len(zset.key)+len(zset.member)+8)
+	// key
+	var index = 0
+	copy(buf[index:index+len(zset.key)], zset.key)
+	index += len(zset.key)
+
+	// version
+	binary.LittleEndian.PutUint64(buf[index:index+8], uint64(zset.version))
+	index += 8
+
+	// member
+	copy(buf[index:], zset.member)
+
+	return buf
+}
+func (zset *zsetInternalKey) encodeWithScore() []byte {
+	scoreBuf := utils.Float64ToBytes(zset.score)
+	buf := make([]byte, len(zset.key)+len(zset.member)+len(scoreBuf)+8+4)
+	// key
+	var index = 0
+	copy(buf[index:index+len(zset.key)], zset.key)
+	index += len(zset.key)
+
+	// version
+	binary.LittleEndian.PutUint64(buf[index:index+8], uint64(zset.version))
+	index += 8
+
+	// score
+	copy(buf[index:index+len(scoreBuf)], scoreBuf)
+	index += len(scoreBuf)
+	// member
+	copy(buf[index:index+len(zset.member)], zset.member)
+	index += len(zset.member)
+
+	//member size
+	binary.LittleEndian.PutUint32(buf[index:], uint32(len(zset.member)))
+	return buf
 }
 
 func (list *ListInternalKey) encode() []byte {
